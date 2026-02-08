@@ -528,21 +528,13 @@ class FYBLECallbacks : public NimBLEAdvertisedDeviceCallbacks {
                     fyGPSLat, fyGPSLon, fyGPSAcc);
             }
             char jsonBuf[512];
-            int jsonLen;
-            if (isRaven) {
-                jsonLen = snprintf(jsonBuf, sizeof(jsonBuf),
-                    "{\"event\":\"detection\",\"detection_method\":\"%s\","
-                    "\"protocol\":\"bluetooth_le\",\"mac_address\":\"%s\","
-                    "\"device_name\":\"%s\",\"rssi\":%d,"
-                    "\"is_raven\":true,\"raven_fw\":\"%s\"%s}",
-                    method, addrStr.c_str(), name.c_str(), rssi, ravenFW, gpsBuf);
-            } else {
-                jsonLen = snprintf(jsonBuf, sizeof(jsonBuf),
-                    "{\"event\":\"detection\",\"detection_method\":\"%s\","
-                    "\"protocol\":\"bluetooth_le\",\"mac_address\":\"%s\","
-                    "\"device_name\":\"%s\",\"rssi\":%d%s}",
-                    method, addrStr.c_str(), name.c_str(), rssi, gpsBuf);
-            }
+            int jsonLen = snprintf(jsonBuf, sizeof(jsonBuf),
+                "{\"event\":\"detection\",\"detection_method\":\"%s\","
+                "\"protocol\":\"bluetooth_le\",\"mac_address\":\"%s\","
+                "\"device_name\":\"%s\",\"rssi\":%d,"
+                "\"is_raven\":%s,\"raven_fw\":\"%s\"%s}",
+                method, addrStr.c_str(), name.c_str(), rssi,
+                isRaven ? "true" : "false", isRaven ? ravenFW : "", gpsBuf);
             printf("%s\n", jsonBuf);
             // Append newline for BLE framing and send
             if (jsonLen > 0 && jsonLen < (int)sizeof(jsonBuf) - 1) {
