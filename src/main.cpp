@@ -133,7 +133,7 @@ struct FYDetection {
     char mac[18];
     char name[48];
     int rssi;
-    char method[24];
+    char method[32];
     unsigned long firstSeen;
     unsigned long lastSeen;
     int count;
@@ -508,9 +508,9 @@ class FYBLECallbacks : public NimBLEAdvertisedDeviceCallbacks {
             }
             if (highConfidence) {
                 fyDeviceInRange = true;
+                fyLastDetTime = millis();
+                fyLastHB = millis();
             }
-            fyLastDetTime = millis();
-            fyLastHB = millis();
         }
     }
 };
