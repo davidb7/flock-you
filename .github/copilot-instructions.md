@@ -11,16 +11,19 @@ Flock-You is a BLE-only surveillance device detector targeting Flock Safety came
 
 ## Build & Flash Commands (Firmware)
 
-Requires [PlatformIO](https://platformio.org/).
+Requires [ESP-IDF v5.1+](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/).
 
 ```bash
-pio run                  # build
-pio run -t upload        # build and flash
-pio device monitor       # open serial monitor at 115200 baud
-pio run -t uploadfs      # flash SPIFFS filesystem
+idf.py set-target esp32s3   # first time only
+idf.py build                # compile (fetches managed components on first run)
+idf.py -p PORT flash        # flash firmware
+idf.py -p PORT monitor      # serial monitor (USB CDC, 115200 baud)
+idf.py -p PORT flash monitor  # flash then monitor
 ```
 
 There is no test suite for the firmware.
+
+> The pre-migration Arduino/PlatformIO source is preserved in `src/main.cpp` for reference.
 
 ## Flask Companion App
 
