@@ -1,0 +1,10 @@
+## IDF Component Manager Manifest
+dependencies:
+  # NimBLE C++ wrapper for ESP-IDF (same API as NimBLE-Arduino 1.4.x)
+  h2zero/esp-nimble-cpp:
+    version: ">=1.4.0"
+  # ArduinoJson (header-only JSON library)
+  bblanchon/arduinojson:
+    version: ">=7.0.4"
+  idf:
+    version: ">=5.1.0"

@@ -75,21 +75,29 @@ After relaunching, connect to the `flockyou` AP, open `192.168.4.1`, and tap the
 
 ## Building & Flashing
 
-Requires [PlatformIO](https://platformio.org/).
+Requires [ESP-IDF v5.1+](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-started/).
 
 ```bash
-cd flock-you
-pio run                     # build
-pio run -t upload           # flash
-pio device monitor          # serial output
+idf.py set-target esp32s3          # first time only
+idf.py build                       # compile
+idf.py -p PORT flash               # flash firmware
+idf.py -p PORT flash --flash-size 8MB  # if flash size is needed explicitly
+idf.py -p PORT monitor             # serial output (115200 baud, USB CDC)
+idf.py -p PORT flash monitor       # flash and immediately open monitor
 ```
 
-**Dependencies** (managed by PlatformIO):
+The first build fetches managed components automatically via the IDF Component Manager:
 
-- `NimBLE-Arduino` — BLE scanning
-- `ESP Async WebServer` + `AsyncTCP` — web dashboard
-- `ArduinoJson` — JSON serialization
-- `SPIFFS` — session persistence to flash
+- `h2zero/esp-nimble-cpp` — NimBLE C++ (same API as NimBLE-Arduino)
+- `bblanchon/arduinojson` — JSON serialization
+- `esp_http_server`, `esp_wifi`, `esp_spiffs` — built-in ESP-IDF components
+
+**Flash the SPIFFS partition** (optional, to pre-format):
+```bash
+idf.py -p PORT spiffs-flash
+```
+
+> The legacy Arduino/PlatformIO source is preserved in `src/main.cpp` for reference.
 
 ---
 
