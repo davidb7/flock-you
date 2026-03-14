@@ -4,7 +4,7 @@
 
 Flock-You is a BLE-only surveillance device detector targeting Flock Safety cameras, Raven gunshot detectors, and related hardware. It runs on a **Seeed Studio XIAO ESP32-S3** and has two components:
 
-- **Firmware** (`src/main.cpp`): Arduino/PlatformIO C++ — the entire firmware is a single file
+- **Firmware** (`main/main.cpp`): ESP-IDF C++ — the entire firmware is a single file built with CMake
 - **Flask companion app** (`api/`): Python desktop dashboard for live serial ingestion and data analysis
 
 ---
@@ -43,7 +43,7 @@ The ESP32-S3 cannot simultaneously scan BLE and serve WiFi AP at full capacity, 
 - **WiFi AP** (`flockyou` / `flockyou123`) serves the web dashboard at `192.168.4.1`
 - **BLE** scans continuously in the background
 
-**Companion mode** switches this behavior: when the DeFlock mobile app connects via BLE GATT or a serial host is detected, `fyCompanionChangePending` is set to `true` in the BLE callback, and `loop()` calls `fyOnCompanionChange()` to disable WiFi AP and boost BLE scan duty cycle. This deferred pattern exists because WiFi operations must not be called from BLE callback context.
+**Companion mode** switches this behavior: when the DeFlock mobile app connects via BLE GATT or a serial host is detected, `fyCompanionChangePending` is set to `true` in the BLE callback, and `fyMainTask()` calls `fyOnCompanionChange()` to disable WiFi AP (via `esp_wifi_stop()`) and boost BLE scan duty cycle. This deferred pattern exists because WiFi operations must not be called from BLE callback context. Serial host detection runs in a dedicated `fySerialMonitorTask` that blocks on `fgetc(stdin)` (USB CDC VFS).
 
 ### Detection Pipeline
 
@@ -84,7 +84,7 @@ Phone GPS is pushed via browser Geolocation API to the ESP32's `/api/gps` endpoi
 
 ## Key Conventions
 
-### Firmware (`src/main.cpp`)
+### Firmware (`main/main.cpp`)
 
 - **All globals/functions prefixed `fy`**: `fyDet`, `fyMutex`, `fyServer`, `fyGPSLat`, `fyBeep()`, etc.
 - **Section headers**: `// ===...===` comment blocks divide the file into logical sections (CONFIGURATION, DETECTION PATTERNS, AUDIO SYSTEM, etc.)
@@ -92,6 +92,13 @@ Phone GPS is pushed via browser Geolocation API to the ESP32's `/api/gps` endpoi
 - **JSON name sanitization**: `"` and `\` characters in device names are replaced with `_` before storage
 - **Mutex discipline**: always acquire `fyMutex` with a 100ms timeout; release in all code paths including early returns
 - **Audio**: `fyBeep()` and `fyCaw()` are no-ops when `fyBuzzerOn == false`; all audio must check this
+- **Entry point**: `extern "C" void app_main()` (replaces Arduino `setup()`); the main loop runs in `fyMainTask` via `xTaskCreate`
+- **Platform shims**: `millis()` is an inline shim over `esp_timer_get_time()`; `delay(N)` expands to `vTaskDelay(pdMS_TO_TICKS(N))`
+- **Audio peripheral**: tone generation uses LEDC (`ledc_timer_config` / `ledc_channel_config` / `ledc_set_freq` / `ledc_update_duty`)
+- **WiFi**: `esp_wifi_init` / `esp_wifi_set_mode` / `esp_wifi_set_config` / `esp_wifi_start`; companion mode calls `esp_wifi_stop()` / `esp_wifi_start()` — config persists in RAM, no re-init needed
+- **Filesystem**: `esp_vfs_spiffs_register()` mounts at `/spiffs`; files opened with standard `fopen("/spiffs/...")` returning `FILE*`
+- **HTTP server**: `esp_http_server`; chunked responses via `httpd_resp_send_chunk()`; ended with `httpd_resp_send_chunk(req, NULL, 0)`
+- **Legacy source**: `src/main.cpp` (Arduino/PlatformIO) is preserved as reference only; it is not built
 
 ### OUI Reference Files
 
@@ -105,6 +112,25 @@ When adding new OUIs, place them in the appropriate array:
 - `flock_mac_prefixes[]` — confirmed Flock Safety IEEE registrations or exclusive-use OUIs
 - `flock_mfr_mac_prefixes[]` — shared contract manufacturer OUIs (Liteon, USI) — may false positive on non-Flock devices
 - `soundthinking_mac_prefixes[]` — SoundThinking/ShotSpotter registrations
+
+### Firmware Web Endpoints (`192.168.4.1`)
+
+Registered in `fySetupServer()` using `esp_http_server`. All routes are GET; responses are chunked where output size is variable.
+
+| Endpoint | Description |
+|----------|-------------|
+| `/` | HTML dashboard (self-contained, inline JS polled every 2.5s) |
+| `/api/detections` | Current session detections as JSON array |
+| `/api/stats` | `{total, raven, ble, gps_valid, gps_age, gps_tagged}` |
+| `/api/gps` | Accept GPS fix: `?lat=&lon=&acc=` (pushed by dashboard JS) |
+| `/api/patterns` | Detection pattern arrays (MAC prefixes, UUIDs, names, mfr IDs) |
+| `/api/export/json` | Download current session as JSON |
+| `/api/export/csv` | Download current session as CSV |
+| `/api/export/kml` | Download current session as KML (GPS-tagged devices only) |
+| `/api/history` | Prior session JSON (served from `/spiffs/prev_session.json`) |
+| `/api/history/json` | Download prior session as JSON attachment |
+| `/api/history/kml` | Download prior session as KML (parsed with ArduinoJson) |
+| `/api/clear` | Clear all detections (saves session first, then wipes `fyDet[]`) |
 
 ### Flask API Endpoints
 
